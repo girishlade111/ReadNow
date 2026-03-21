@@ -1,0 +1,5 @@
+{
+  "name": "ReadNow",
+  "description": "A brutalist web app to save and read web pages, articles, and posts in a distraction-free reading mode.",
+  "requestFramePermissions": []
+}
