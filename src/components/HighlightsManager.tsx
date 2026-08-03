@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Highlight } from '../types';
-import { Highlight as HighlightIcon, Trash2, StickyNote, Copy, Check, Plus } from 'lucide-react';
+import { Highlighter as HighlightIcon, Trash2, StickyNote, Copy, Check, Plus } from 'lucide-react';
 
 interface HighlightsManagerProps {
   highlights: Highlight[];
