@@ -1,7 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 # ReadNow — Enterprise Knowledge Platform & Distraction-Free Reader
 
 > A brutalist-designed web app to **save, read, analyze, and share** web pages, articles, internal documents, podcasts, and video transcripts in a clean, distraction-free reading mode — supercharged with Google Gemini AI.
