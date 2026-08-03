@@ -1,6 +1,6 @@
 import React from 'react';
 import { Article } from '../types';
-import { Link } from 'react_router_dom'; // Note: react-router-dom
+import { Link } from 'react-router-dom'; // Note: react-router-dom
 import { Star, Trash2, Archive, Clock, Sparkles, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
