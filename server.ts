@@ -35,36 +35,150 @@ async function dispatchWebhook(event: string, payload: any) {
 
 // 1. Article Parsing & Persistence
 app.post("/api/parse", async (req, res) => {
-  const { url } = req.body;
-  if (!url) {
+  const { url, tags, collectionId } = req.body;
+  if (!url || typeof url !== 'string' || !url.trim()) {
     return res.status(400).json({ error: "URL is required" });
   }
 
   try {
-    new URL(url); // Validate URL syntax
-
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    let targetUrl = url.trim();
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = "https://" + targetUrl;
     }
 
-    const html = await response.text();
-    const doc = new JSDOM(html, { url });
-    const reader = new Readability(doc.window.document);
-    const article = reader.parse();
+    let urlObj: URL;
+    try {
+      urlObj = new URL(targetUrl);
+    } catch {
+      return res.status(400).json({ error: "Invalid URL syntax. Please enter a valid web address." });
+    }
 
-    if (!article) {
-      throw new Error("Could not parse article content from this web page.");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let html = "";
+    try {
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache",
+          "Sec-Ch-Ua": '"Chromium";v="123", "Not:A-Brand";v="8"',
+          "Sec-Ch-Ua-Mobile": "?0",
+          "Sec-Ch-Ua-Platform": '"Windows"',
+          "Sec-Fetch-Dest": "document",
+          "Sec-Fetch-Mode": "navigate",
+          "Sec-Fetch-Site": "cross-site",
+          "Sec-Fetch-User": "?1",
+          "Upgrade-Insecure-Requests": "1"
+        }
+      });
+
+      html = await response.text();
+
+      if (!response.ok && !html.trim()) {
+        throw new Error(`Failed to fetch webpage (HTTP ${response.status} ${response.statusText})`);
+      }
+    } catch (fetchErr: any) {
+      if (fetchErr.name === 'AbortError') {
+        throw new Error("Request timed out while connecting to the target website (15s limit).");
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!html || !html.trim()) {
+      throw new Error("Target webpage returned an empty response.");
+    }
+
+    const doc = new JSDOM(html, { url: targetUrl });
+    const document = doc.window.document;
+
+    // Remove unwanted interactive/script elements before parsing
+    const scripts = document.querySelectorAll("script, style, noscript, svg, iframe, form");
+    scripts.forEach(s => s.remove());
+
+    const reader = new Readability(document);
+    const parsed = reader.parse();
+
+    let title = parsed?.title?.trim() || "";
+    let content = parsed?.content?.trim() || "";
+    let textContent = parsed?.textContent?.trim() || "";
+    let byline = parsed?.byline?.trim() || null;
+    let excerpt = parsed?.excerpt?.trim() || null;
+    let siteName = parsed?.siteName?.trim() || null;
+    let publishedTime = parsed?.publishedTime || null;
+
+    // Fallback extraction if Readability failed or returned very minimal content
+    if (!content || textContent.length < 80) {
+      // 1. Extract Title Fallback
+      if (!title) {
+        const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
+        const twTitle = document.querySelector('meta[name="twitter:title"]')?.getAttribute('content');
+        const docTitle = document.title;
+        const h1Title = document.querySelector('h1')?.textContent?.trim();
+        title = ogTitle || twTitle || docTitle || h1Title || urlObj.hostname;
+      }
+
+      // 2. Extract Site Name Fallback
+      if (!siteName) {
+        const ogSiteName = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content');
+        const hostname = urlObj.hostname.replace(/^www\./, '');
+        siteName = ogSiteName || (hostname.charAt(0).toUpperCase() + hostname.slice(1));
+      }
+
+      // 3. Extract Excerpt Fallback
+      if (!excerpt) {
+        const ogDesc = document.querySelector('meta[property="og:description"]')?.getAttribute('content');
+        const metaDesc = document.querySelector('meta[name="description"]')?.getAttribute('content');
+        excerpt = ogDesc || metaDesc || null;
+      }
+
+      // 4. Extract Author Fallback
+      if (!byline) {
+        const metaAuthor = document.querySelector('meta[name="author"]')?.getAttribute('content') ||
+                           document.querySelector('meta[property="article:author"]')?.getAttribute('content');
+        byline = metaAuthor || null;
+      }
+
+      // 5. Extract Main DOM Content
+      const mainContainer = document.querySelector('main, article, #content, .content, .post-content, .entry-content, .article-body, body');
+      if (mainContainer) {
+        const paragraphs = Array.from(mainContainer.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote'));
+        if (paragraphs.length > 0) {
+          content = paragraphs.map(p => p.outerHTML).join('\n');
+          textContent = paragraphs.map(p => p.textContent?.trim() || '').filter(Boolean).join('\n\n');
+        } else {
+          textContent = mainContainer.textContent?.trim() || "";
+          content = `<p>${textContent.replace(/\n\n+/g, '</p><p>')}</p>`;
+        }
+      }
+
+      // Final safety check
+      if (!textContent) {
+        textContent = document.body?.textContent?.trim() || "No text content available.";
+        content = `<p>${textContent.replace(/\n\n+/g, '</p><p>')}</p>`;
+      }
+
+      if (!excerpt) {
+        excerpt = textContent.slice(0, 200) + '...';
+      }
+    }
+
+    const hostname = urlObj.hostname.replace(/^www\./, '');
+    if (!siteName) {
+      siteName = hostname.charAt(0).toUpperCase() + hostname.slice(1);
+    }
+    if (!title) {
+      title = `Article from ${siteName}`;
     }
 
     const id = Math.random().toString(36).substring(2, 15);
-    let textContent = article.textContent || "";
-    
+
     // Apply DLP PII Masking if enabled
     const settings = db.getSettings();
     if (settings.dlpEnabled) {
@@ -72,29 +186,31 @@ app.post("/api/parse", async (req, res) => {
     }
 
     const readingTime = calculateReadingTime(textContent);
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
-    const siteName = article.siteName || hostname.charAt(0).toUpperCase() + hostname.slice(1);
+    const aiAnalysis = await generateArticleAnalysis(title, textContent);
 
-    // Initial AI analysis
-    const aiAnalysis = await generateArticleAnalysis(article.title || "Untitled Article", textContent);
+    // Combine user-provided tags with AI tags
+    const combinedTags = Array.isArray(tags) && tags.length > 0
+      ? Array.from(new Set([...tags, ...(aiAnalysis.suggestedTags || [])]))
+      : (aiAnalysis.suggestedTags || [siteName]);
 
     const newArticle: Article = {
       id,
-      url,
-      title: article.title || "Untitled Article",
-      byline: article.byline || null,
-      dir: article.dir || null,
-      content: article.content || "",
+      url: targetUrl,
+      title,
+      byline,
+      dir: null,
+      content,
       textContent,
-      length: article.length || 0,
-      excerpt: article.excerpt || textContent.slice(0, 200) || null,
+      length: textContent.length,
+      excerpt,
       siteName,
-      publishedTime: article.publishedTime || null,
+      publishedTime,
       savedAt: new Date().toISOString(),
       isArchived: false,
       isFavorite: false,
       readProgress: 0,
-      tags: aiAnalysis.suggestedTags || [siteName],
+      tags: combinedTags,
+      collectionId: collectionId || undefined,
       mediaType: 'web',
       aiAnalysis: {
         ...aiAnalysis,
