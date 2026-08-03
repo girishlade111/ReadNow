@@ -1,42 +1,76 @@
 @import "tailwindcss";
 
-@theme {
+:root {
   --font-sans: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-@layer base {
-  body {
-    @apply bg-[#f4f4f0] text-black font-sans selection:bg-red-500 selection:text-white;
-  }
+body {
+  background-color: #f4f4f0;
+  color: #000000;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background-color: #ef4444;
+  color: #ffffff;
 }
 
 .brutal-border {
-  @apply border-4 border-black;
+  border: 4px solid #000000;
 }
 
 .brutal-shadow {
-  @apply shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all;
+  box-shadow: 8px 8px 0px 0px rgba(0, 0, 0, 1);
+  transition: all 0.15s ease-in-out;
 }
 
 .brutal-shadow:hover {
-  @apply shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-x-[4px] translate-y-[4px];
+  box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 1);
+  transform: translate(4px, 4px);
 }
 
 .brutal-shadow:active {
-  @apply shadow-none translate-x-[8px] translate-y-[8px];
+  box-shadow: none;
+  transform: translate(8px, 8px);
 }
 
 .brutal-card {
-  @apply bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6;
+  background-color: #ffffff;
+  border: 4px solid #000000;
+  box-shadow: 8px 8px 0px 0px rgba(0, 0, 0, 1);
+  padding: 1.5rem;
 }
 
 .brutal-button {
-  @apply bg-red-600 text-white font-bold uppercase tracking-wider border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] px-6 py-3 cursor-pointer transition-all active:shadow-none active:translate-x-1 active:translate-y-1;
+  background-color: #dc2626;
+  color: #ffffff;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 4px solid #000000;
+  box-shadow: 8px 8px 0px 0px rgba(0, 0, 0, 1);
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.brutal-button:active {
+  box-shadow: none;
+  transform: translate(4px, 4px);
 }
 
 .brutal-input {
-  @apply bg-white text-black border-4 border-black px-4 py-3 focus:outline-none focus:ring-4 focus:ring-red-500/50 font-medium;
+  background-color: #ffffff;
+  color: #000000;
+  border: 4px solid #000000;
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+  outline: none;
+}
+
+.brutal-input:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4);
 }
 
 /* Reader Mode Custom Themes */
@@ -49,6 +83,7 @@
   background-color: #09090b !important;
   color: #f4f4f5 !important;
 }
+
 .theme-brutal-dark .brutal-card {
   background-color: #18181b !important;
   color: #f4f4f5 !important;
@@ -60,6 +95,7 @@
   background-color: #f4ecd8 !important;
   color: #433422 !important;
 }
+
 .theme-sepia .brutal-card {
   background-color: #fbf0d9 !important;
   color: #433422 !important;
@@ -70,6 +106,7 @@
   background-color: #facc15 !important;
   color: #000000 !important;
 }
+
 .theme-cyberpunk .brutal-card {
   background-color: #ffffff !important;
   color: #000000 !important;
@@ -78,59 +115,131 @@
 
 /* Reader content typography */
 .reader-content {
-  @apply text-lg leading-relaxed max-w-4xl mx-auto font-medium;
+  font-size: 1.125rem;
+  line-height: 1.75;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-weight: 500;
 }
 
 .reader-content p {
-  @apply mb-6;
+  margin-bottom: 1.5rem;
 }
 
-.reader-content h1, .reader-content h2, .reader-content h3, .reader-content h4 {
-  @apply font-black mt-10 mb-4 tracking-tight uppercase;
+.reader-content h1,
+.reader-content h2,
+.reader-content h3,
+.reader-content h4 {
+  font-weight: 900;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
 }
 
-.reader-content h1 { @apply text-4xl border-b-4 border-black pb-2; }
-.reader-content h2 { @apply text-3xl border-b-2 border-black pb-1; }
-.reader-content h3 { @apply text-2xl; }
+.reader-content h1 {
+  font-size: 2.25rem;
+  border-bottom: 4px solid #000000;
+  padding-bottom: 0.5rem;
+}
 
-.reader-content img, .reader-content video {
-  @apply max-w-full h-auto my-8 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)];
+.reader-content h2 {
+  font-size: 1.875rem;
+  border-bottom: 2px solid #000000;
+  padding-bottom: 0.25rem;
+}
+
+.reader-content h3 {
+  font-size: 1.5rem;
+}
+
+.reader-content img,
+.reader-content video {
+  max-width: 100%;
+  height: auto;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  border: 4px solid #000000;
+  box-shadow: 6px 6px 0px 0px rgba(0, 0, 0, 1);
 }
 
 .reader-content a {
-  @apply text-red-600 underline decoration-2 underline-offset-4 hover:bg-red-600 hover:text-white transition-colors font-bold;
+  color: #dc2626;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  font-weight: 700;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+
+.reader-content a:hover {
+  background-color: #dc2626;
+  color: #ffffff;
 }
 
 .reader-content blockquote {
-  @apply border-l-8 border-red-600 pl-6 py-4 my-8 italic bg-gray-50 border-4 border-black font-semibold text-lg;
+  border-left: 8px solid #dc2626;
+  padding-left: 1.5rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  font-style: italic;
+  background-color: #f9fafb;
+  border: 4px solid #000000;
+  font-weight: 600;
+  font-size: 1.125rem;
 }
 
-.reader-content ul, .reader-content ol {
-  @apply mb-6 pl-8 font-medium;
+.reader-content ul,
+.reader-content ol {
+  margin-bottom: 1.5rem;
+  padding-left: 2rem;
+  font-weight: 500;
 }
 
 .reader-content ul {
-  @apply list-disc;
+  list-style-type: disc;
 }
 
 .reader-content ol {
-  @apply list-decimal;
+  list-style-type: decimal;
 }
 
 .reader-content li {
-  @apply mb-2;
+  margin-bottom: 0.5rem;
 }
 
 .reader-content pre {
-  @apply bg-black text-white p-6 overflow-x-auto border-4 border-black my-6 font-mono text-sm shadow-[6px_6px_0px_0px_rgba(239,68,68,1)];
+  background-color: #000000;
+  color: #ffffff;
+  padding: 1.5rem;
+  overflow-x: auto;
+  border: 4px solid #000000;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  box-shadow: 6px 6px 0px 0px rgba(239, 68, 68, 1);
 }
 
 .reader-content code {
-  @apply bg-gray-200 text-black px-1.5 py-0.5 font-mono text-sm border-2 border-black font-bold;
+  background-color: #e5e7eb;
+  color: #000000;
+  padding: 0.125rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  border: 2px solid #000000;
+  font-weight: 700;
 }
 
 .reader-content pre code {
-  @apply bg-transparent border-none p-0 text-white font-normal;
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  color: #ffffff;
+  font-weight: 400;
 }
 
 /* Print Styles */
