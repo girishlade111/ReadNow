@@ -1,38 +1,40 @@
+import React, { useState, useEffect, FormEvent, MouseEvent, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
-import { useState, useEffect, FormEvent, MouseEvent, useMemo } from 'react';
 import DOMPurify from 'dompurify';
-import { formatDistanceToNow } from 'date-fns';
 import {
   BookOpen, Plus, Search, ArrowLeft, ExternalLink, Loader2, Sparkles,
-  Volume2, Highlighter as HighlightIcon, Sliders, Download, CheckCircle2, Star, Archive
+  Volume2, Sliders, Download
 } from 'lucide-react';
 
 import { Article, Highlight, ReaderSettings } from './types';
 import { api } from './services/api';
+import { localStorageService } from './services/storage';
 import { Navbar } from './components/Navbar';
 import { ArticleCard } from './components/ArticleCard';
-import { AudioPlayer } from './components/AudioPlayer';
-import { AiCopilotDrawer } from './components/AiCopilotDrawer';
-import { HighlightsManager } from './components/HighlightsManager';
-import { ReaderSettingsModal } from './components/ReaderSettingsModal';
-import { AnalyticsDashboard } from './components/AnalyticsDashboard';
-import { ExportModal } from './components/ExportModal';
 
-import { GlobalRAGDrawer } from './components/GlobalRAGDrawer';
-import { TeamCollectionsModal } from './components/TeamCollectionsModal';
-import { AuditLogsModal } from './components/AuditLogsModal';
-import { IntegrationsModal } from './components/IntegrationsModal';
-import { TeamDigestModal } from './components/TeamDigestModal';
+// Lazy-loaded components for code-splitting and bundle size optimization
+const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
+const ReaderSettingsModal = lazy(() => import('./components/ReaderSettingsModal').then(m => ({ default: m.ReaderSettingsModal })));
+const GlobalRAGDrawer = lazy(() => import('./components/GlobalRAGDrawer').then(m => ({ default: m.GlobalRAGDrawer })));
+const TeamCollectionsModal = lazy(() => import('./components/TeamCollectionsModal').then(m => ({ default: m.TeamCollectionsModal })));
+const AuditLogsModal = lazy(() => import('./components/AuditLogsModal').then(m => ({ default: m.AuditLogsModal })));
+const IntegrationsModal = lazy(() => import('./components/IntegrationsModal').then(m => ({ default: m.IntegrationsModal })));
+const TeamDigestModal = lazy(() => import('./components/TeamDigestModal').then(m => ({ default: m.TeamDigestModal })));
+const ExportModal = lazy(() => import('./components/ExportModal').then(m => ({ default: m.ExportModal })));
+const AiCopilotDrawer = lazy(() => import('./components/AiCopilotDrawer').then(m => ({ default: m.AiCopilotDrawer })));
+const HighlightsManager = lazy(() => import('./components/HighlightsManager').then(m => ({ default: m.HighlightsManager })));
+const AudioPlayer = lazy(() => import('./components/AudioPlayer').then(m => ({ default: m.AudioPlayer })));
 
-const DEFAULT_SETTINGS: ReaderSettings = {
-  fontFamily: 'sans',
-  fontSize: 18,
-  lineHeight: 1.6,
-  columnWidth: 'normal',
-  theme: 'brutal-light',
-  bionicReading: false,
-  autoSpeechRate: 1.0
-};
+function ComponentFallback() {
+  return (
+    <div className="flex items-center justify-center p-8 my-4 bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+      <div className="flex items-center gap-3 font-mono font-bold text-xs uppercase text-black">
+        <Loader2 className="w-5 h-5 animate-spin text-red-600" />
+        <span>Lazy Loading Component...</span>
+      </div>
+    </div>
+  );
+}
 
 function Home() {
   const navigate = useNavigate();
@@ -41,10 +43,13 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [initialLoading, setInitialLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'archive' | 'analytics'>('all');
+
+  // Persisted lightweight user preferences via LocalStorage
+  const [searchQuery, setSearchQuery] = useState(() => localStorageService.getSearchQuery());
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'archive' | 'analytics'>(() => localStorageService.getActiveTab());
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | undefined>(undefined);
+  const [settings, setSettings] = useState<ReaderSettings>(() => localStorageService.getReaderSettings());
   
   // Enterprise Modal States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -54,18 +59,29 @@ function Home() {
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
   const [isDigestOpen, setIsDigestOpen] = useState(false);
 
-  const [settings, setSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS);
-
   useEffect(() => {
     loadArticles();
   }, []);
+
+  useEffect(() => {
+    localStorageService.saveActiveTab(activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorageService.saveSearchQuery(searchQuery);
+  }, [searchQuery]);
+
+  const handleUpdateSettings = (newSettings: Partial<ReaderSettings>) => {
+    const updated = localStorageService.saveReaderSettings(newSettings);
+    setSettings(updated);
+  };
 
   const loadArticles = async () => {
     try {
       const fetched = await api.getArticles();
       setArticles(fetched);
     } catch (e: any) {
-      setError('Failed to load articles');
+      setError('Failed to load articles from IndexedDB / Server');
     } finally {
       setInitialLoading(false);
     }
@@ -167,37 +183,54 @@ function Home() {
           openDigest={() => setIsDigestOpen(true)}
           articleCount={articles.filter(a => !a.isArchived).length}
         />
-        <AnalyticsDashboard />
-        <ReaderSettingsModal
-          settings={settings}
-          onUpdateSettings={(s) => setSettings(prev => ({ ...prev, ...s }))}
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-        />
-        <GlobalRAGDrawer
-          isOpen={isRAGOpen}
-          onClose={() => setIsRAGOpen(false)}
-          onSelectArticle={(articleId) => navigate(`/read/${articleId}`)}
-        />
-        <TeamCollectionsModal
-          isOpen={isCollectionsOpen}
-          onClose={() => setIsCollectionsOpen(false)}
-          selectedCollectionId={selectedCollectionId}
-          onSelectCollection={(colId) => setSelectedCollectionId(colId)}
-        />
-        <AuditLogsModal
-          isOpen={isAuditLogsOpen}
-          onClose={() => setIsAuditLogsOpen(false)}
-        />
-        <IntegrationsModal
-          isOpen={isIntegrationsOpen}
-          onClose={() => setIsIntegrationsOpen(false)}
-          onArticleAdded={loadArticles}
-        />
-        <TeamDigestModal
-          isOpen={isDigestOpen}
-          onClose={() => setIsDigestOpen(false)}
-        />
+        <Suspense fallback={<ComponentFallback />}>
+          <AnalyticsDashboard />
+        </Suspense>
+
+        <Suspense fallback={null}>
+          {isSettingsOpen && (
+            <ReaderSettingsModal
+              settings={settings}
+              onUpdateSettings={handleUpdateSettings}
+              isOpen={isSettingsOpen}
+              onClose={() => setIsSettingsOpen(false)}
+            />
+          )}
+          {isRAGOpen && (
+            <GlobalRAGDrawer
+              isOpen={isRAGOpen}
+              onClose={() => setIsRAGOpen(false)}
+              onSelectArticle={(articleId) => navigate(`/read/${articleId}`)}
+            />
+          )}
+          {isCollectionsOpen && (
+            <TeamCollectionsModal
+              isOpen={isCollectionsOpen}
+              onClose={() => setIsCollectionsOpen(false)}
+              selectedCollectionId={selectedCollectionId}
+              onSelectCollection={(colId) => setSelectedCollectionId(colId)}
+            />
+          )}
+          {isAuditLogsOpen && (
+            <AuditLogsModal
+              isOpen={isAuditLogsOpen}
+              onClose={() => setIsAuditLogsOpen(false)}
+            />
+          )}
+          {isIntegrationsOpen && (
+            <IntegrationsModal
+              isOpen={isIntegrationsOpen}
+              onClose={() => setIsIntegrationsOpen(false)}
+              onArticleAdded={loadArticles}
+            />
+          )}
+          {isDigestOpen && (
+            <TeamDigestModal
+              isOpen={isDigestOpen}
+              onClose={() => setIsDigestOpen(false)}
+            />
+          )}
+        </Suspense>
       </div>
     );
   }
@@ -330,42 +363,56 @@ function Home() {
 
       </main>
 
-      {/* Enterprise Modals & Drawers */}
-      <ReaderSettingsModal
-        settings={settings}
-        onUpdateSettings={(s) => setSettings(prev => ({ ...prev, ...s }))}
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+      {/* Enterprise Modals & Drawers with Lazy Loading */}
+      <Suspense fallback={null}>
+        {isSettingsOpen && (
+          <ReaderSettingsModal
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+        )}
 
-      <GlobalRAGDrawer
-        isOpen={isRAGOpen}
-        onClose={() => setIsRAGOpen(false)}
-        onSelectArticle={(articleId) => navigate(`/read/${articleId}`)}
-      />
+        {isRAGOpen && (
+          <GlobalRAGDrawer
+            isOpen={isRAGOpen}
+            onClose={() => setIsRAGOpen(false)}
+            onSelectArticle={(articleId) => navigate(`/read/${articleId}`)}
+          />
+        )}
 
-      <TeamCollectionsModal
-        isOpen={isCollectionsOpen}
-        onClose={() => setIsCollectionsOpen(false)}
-        selectedCollectionId={selectedCollectionId}
-        onSelectCollection={(colId) => setSelectedCollectionId(colId)}
-      />
+        {isCollectionsOpen && (
+          <TeamCollectionsModal
+            isOpen={isCollectionsOpen}
+            onClose={() => setIsCollectionsOpen(false)}
+            selectedCollectionId={selectedCollectionId}
+            onSelectCollection={(colId) => setSelectedCollectionId(colId)}
+          />
+        )}
 
-      <AuditLogsModal
-        isOpen={isAuditLogsOpen}
-        onClose={() => setIsAuditLogsOpen(false)}
-      />
+        {isAuditLogsOpen && (
+          <AuditLogsModal
+            isOpen={isAuditLogsOpen}
+            onClose={() => setIsAuditLogsOpen(false)}
+          />
+        )}
 
-      <IntegrationsModal
-        isOpen={isIntegrationsOpen}
-        onClose={() => setIsIntegrationsOpen(false)}
-        onArticleAdded={loadArticles}
-      />
+        {isIntegrationsOpen && (
+          <IntegrationsModal
+            isOpen={isIntegrationsOpen}
+            onClose={() => setIsIntegrationsOpen(false)}
+            onArticleAdded={loadArticles}
+          />
+        )}
 
-      <TeamDigestModal
-        isOpen={isDigestOpen}
-        onClose={() => setIsDigestOpen(false)}
-      />
+        {isDigestOpen && (
+          <TeamDigestModal
+            isOpen={isDigestOpen}
+            onClose={() => setIsDigestOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }
@@ -385,7 +432,7 @@ function Reader() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   
-  const [settings, setSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<ReaderSettings>(() => localStorageService.getReaderSettings());
   const [selectedText, setSelectedText] = useState('');
   const [activeTranslation, setActiveTranslation] = useState<{ title: string; content: string } | null>(null);
 
@@ -406,6 +453,11 @@ function Reader() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpdateSettings = (newSettings: Partial<ReaderSettings>) => {
+    const updated = localStorageService.saveReaderSettings(newSettings);
+    setSettings(updated);
   };
 
   // Text selection handler
@@ -483,7 +535,7 @@ function Reader() {
     ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol',
       'li', 'b', 'i', 'strong', 'em', 'strike', 'code', 'hr', 'br', 'div',
       'table', 'thead', 'caption', 'tbody', 'tr', 'th', 'td', 'pre', 'iframe', 'img', 'video', 'source', 'figure', 'figcaption'],
-    ALLOWED_ATTR: ['href', 'name', 'target', 'src', 'alt', 'title', 'class', 'id', 'controls', 'width', 'height', 'allowfullscreen', 'frameborder'],
+    ALLOWED_ATTR: ['href', 'name', 'target', 'src', 'alt', 'title', 'class', 'id', 'controls', 'width', 'height', 'allowfullscreen', 'frameborder', 'loading'],
   });
 
   // Apply typography classes based on reader settings
@@ -566,10 +618,12 @@ function Reader() {
           </div>
         </nav>
 
-        {/* Audio Player Dock */}
-        {isAudioOpen && (
-          <AudioPlayer title={activeTitle} text={article.textContent} />
-        )}
+        {/* Audio Player Dock with Lazy Suspense */}
+        <Suspense fallback={null}>
+          {isAudioOpen && (
+            <AudioPlayer title={activeTitle} text={article.textContent} />
+          )}
+        </Suspense>
 
         {/* Article Body Card */}
         <article
@@ -629,39 +683,47 @@ function Reader() {
 
           {/* Highlights & Sticky Notes Section */}
           <div className="mt-16 pt-8 border-t-8 border-black">
-            <HighlightsManager
-              highlights={highlights}
-              onAddHighlight={handleAddHighlight}
-              onDeleteHighlight={handleDeleteHighlight}
-              selectedText={selectedText}
-              clearSelection={() => setSelectedText('')}
-            />
+            <Suspense fallback={<ComponentFallback />}>
+              <HighlightsManager
+                highlights={highlights}
+                onAddHighlight={handleAddHighlight}
+                onDeleteHighlight={handleDeleteHighlight}
+                selectedText={selectedText}
+                clearSelection={() => setSelectedText('')}
+              />
+            </Suspense>
           </div>
         </article>
       </div>
 
-      {/* AI Copilot Slideover Drawer */}
-      <AiCopilotDrawer
-        article={article}
-        isOpen={isCopilotOpen}
-        onClose={() => setIsCopilotOpen(false)}
-        onTranslationChange={(lang, data) => setActiveTranslation(data)}
-      />
+      {/* AI Copilot & Modals with Lazy Suspense */}
+      <Suspense fallback={null}>
+        {isCopilotOpen && (
+          <AiCopilotDrawer
+            article={article}
+            isOpen={isCopilotOpen}
+            onClose={() => setIsCopilotOpen(false)}
+            onTranslationChange={(lang, data) => setActiveTranslation(data)}
+          />
+        )}
 
-      {/* Reader Preferences Modal */}
-      <ReaderSettingsModal
-        settings={settings}
-        onUpdateSettings={(s) => setSettings(prev => ({ ...prev, ...s }))}
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+        {isSettingsOpen && (
+          <ReaderSettingsModal
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+        )}
 
-      {/* Export Options Modal */}
-      <ExportModal
-        article={article}
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-      />
+        {isExportOpen && (
+          <ExportModal
+            article={article}
+            isOpen={isExportOpen}
+            onClose={() => setIsExportOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }
