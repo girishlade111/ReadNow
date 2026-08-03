@@ -32,16 +32,53 @@
 }
 
 .brutal-button {
-  @apply bg-red-600 text-white font-bold uppercase tracking-wider border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] px-6 py-3 cursor-pointer;
+  @apply bg-red-600 text-white font-bold uppercase tracking-wider border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] px-6 py-3 cursor-pointer transition-all active:shadow-none active:translate-x-1 active:translate-y-1;
 }
 
 .brutal-input {
-  @apply bg-white text-black border-4 border-black px-4 py-3 focus:outline-none focus:ring-4 focus:ring-red-500/50;
+  @apply bg-white text-black border-4 border-black px-4 py-3 focus:outline-none focus:ring-4 focus:ring-red-500/50 font-medium;
 }
 
-/* Reader mode styles */
+/* Reader Mode Custom Themes */
+.theme-brutal-light {
+  background-color: #f4f4f0 !important;
+  color: #000000 !important;
+}
+
+.theme-brutal-dark {
+  background-color: #09090b !important;
+  color: #f4f4f5 !important;
+}
+.theme-brutal-dark .brutal-card {
+  background-color: #18181b !important;
+  color: #f4f4f5 !important;
+  border-color: #ffffff !important;
+  shadow-color: #ffffff !important;
+}
+
+.theme-sepia {
+  background-color: #f4ecd8 !important;
+  color: #433422 !important;
+}
+.theme-sepia .brutal-card {
+  background-color: #fbf0d9 !important;
+  color: #433422 !important;
+  border-color: #433422 !important;
+}
+
+.theme-cyberpunk {
+  background-color: #facc15 !important;
+  color: #000000 !important;
+}
+.theme-cyberpunk .brutal-card {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+/* Reader content typography */
 .reader-content {
-  @apply font-sans text-lg leading-relaxed max-w-3xl mx-auto;
+  @apply text-lg leading-relaxed max-w-4xl mx-auto font-medium;
 }
 
 .reader-content p {
@@ -49,27 +86,27 @@
 }
 
 .reader-content h1, .reader-content h2, .reader-content h3, .reader-content h4 {
-  @apply font-bold mt-10 mb-4;
+  @apply font-black mt-10 mb-4 tracking-tight uppercase;
 }
 
-.reader-content h1 { @apply text-4xl; }
-.reader-content h2 { @apply text-3xl; }
+.reader-content h1 { @apply text-4xl border-b-4 border-black pb-2; }
+.reader-content h2 { @apply text-3xl border-b-2 border-black pb-1; }
 .reader-content h3 { @apply text-2xl; }
 
 .reader-content img, .reader-content video {
-  @apply max-w-full h-auto my-8 border-4 border-black;
+  @apply max-w-full h-auto my-8 border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)];
 }
 
 .reader-content a {
-  @apply text-red-600 underline decoration-2 underline-offset-4 hover:bg-red-600 hover:text-white transition-colors;
+  @apply text-red-600 underline decoration-2 underline-offset-4 hover:bg-red-600 hover:text-white transition-colors font-bold;
 }
 
 .reader-content blockquote {
-  @apply border-l-8 border-red-600 pl-6 py-2 my-8 italic bg-white border-4 border-black;
+  @apply border-l-8 border-red-600 pl-6 py-4 my-8 italic bg-gray-50 border-4 border-black font-semibold text-lg;
 }
 
 .reader-content ul, .reader-content ol {
-  @apply mb-6 pl-8;
+  @apply mb-6 pl-8 font-medium;
 }
 
 .reader-content ul {
@@ -85,13 +122,28 @@
 }
 
 .reader-content pre {
-  @apply bg-black text-white p-4 overflow-x-auto border-4 border-black my-6 font-mono text-sm;
+  @apply bg-black text-white p-6 overflow-x-auto border-4 border-black my-6 font-mono text-sm shadow-[6px_6px_0px_0px_rgba(239,68,68,1)];
 }
 
 .reader-content code {
-  @apply bg-gray-200 px-1 py-0.5 font-mono text-sm border-4 border-black border-2;
+  @apply bg-gray-200 text-black px-1.5 py-0.5 font-mono text-sm border-2 border-black font-bold;
 }
 
 .reader-content pre code {
-  @apply bg-transparent border-none p-0;
+  @apply bg-transparent border-none p-0 text-white font-normal;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  header, nav, .audio-player-dock, button {
+    display: none !important;
+  }
+  .brutal-card {
+    box-shadow: none !important;
+    border: none !important;
+  }
 }
