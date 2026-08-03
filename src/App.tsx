@@ -18,6 +18,12 @@ import { ReaderSettingsModal } from './components/ReaderSettingsModal';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ExportModal } from './components/ExportModal';
 
+import { GlobalRAGDrawer } from './components/GlobalRAGDrawer';
+import { TeamCollectionsModal } from './components/TeamCollectionsModal';
+import { AuditLogsModal } from './components/AuditLogsModal';
+import { IntegrationsModal } from './components/IntegrationsModal';
+import { TeamDigestModal } from './components/TeamDigestModal';
+
 const DEFAULT_SETTINGS: ReaderSettings = {
   fontFamily: 'sans',
   fontSize: 18,
@@ -29,6 +35,7 @@ const DEFAULT_SETTINGS: ReaderSettings = {
 };
 
 function Home() {
+  const navigate = useNavigate();
   const [url, setUrl] = useState('');
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
@@ -37,7 +44,16 @@ function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'archive' | 'analytics'>('all');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | undefined>(undefined);
+  
+  // Enterprise Modal States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isRAGOpen, setIsRAGOpen] = useState(false);
+  const [isCollectionsOpen, setIsCollectionsOpen] = useState(false);
+  const [isAuditLogsOpen, setIsAuditLogsOpen] = useState(false);
+  const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
+  const [isDigestOpen, setIsDigestOpen] = useState(false);
+
   const [settings, setSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
@@ -110,6 +126,9 @@ function Home() {
       if (activeTab === 'archive' && !a.isArchived) return false;
       if (activeTab === 'all' && a.isArchived) return false;
 
+      // Collection filter
+      if (selectedCollectionId && a.collectionId !== selectedCollectionId) return false;
+
       // Tag filter
       if (selectedTag && (!a.tags || !a.tags.includes(selectedTag))) return false;
 
@@ -123,7 +142,7 @@ function Home() {
         (a.tags && a.tags.some(t => t.toLowerCase().includes(q)))
       );
     });
-  }, [articles, activeTab, selectedTag, searchQuery]);
+  }, [articles, activeTab, selectedCollectionId, selectedTag, searchQuery]);
 
   // Extract all unique tags
   const allTags = useMemo(() => {
@@ -141,6 +160,11 @@ function Home() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           openSettings={() => setIsSettingsOpen(true)}
+          openGlobalRAG={() => setIsRAGOpen(true)}
+          openCollections={() => setIsCollectionsOpen(true)}
+          openAuditLogs={() => setIsAuditLogsOpen(true)}
+          openIntegrations={() => setIsIntegrationsOpen(true)}
+          openDigest={() => setIsDigestOpen(true)}
           articleCount={articles.filter(a => !a.isArchived).length}
         />
         <AnalyticsDashboard />
@@ -149,6 +173,30 @@ function Home() {
           onUpdateSettings={(s) => setSettings(prev => ({ ...prev, ...s }))}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
+        />
+        <GlobalRAGDrawer
+          isOpen={isRAGOpen}
+          onClose={() => setIsRAGOpen(false)}
+          onSelectArticle={(articleId) => navigate(`/read/${articleId}`)}
+        />
+        <TeamCollectionsModal
+          isOpen={isCollectionsOpen}
+          onClose={() => setIsCollectionsOpen(false)}
+          selectedCollectionId={selectedCollectionId}
+          onSelectCollection={(colId) => setSelectedCollectionId(colId)}
+        />
+        <AuditLogsModal
+          isOpen={isAuditLogsOpen}
+          onClose={() => setIsAuditLogsOpen(false)}
+        />
+        <IntegrationsModal
+          isOpen={isIntegrationsOpen}
+          onClose={() => setIsIntegrationsOpen(false)}
+          onArticleAdded={loadArticles}
+        />
+        <TeamDigestModal
+          isOpen={isDigestOpen}
+          onClose={() => setIsDigestOpen(false)}
         />
       </div>
     );
@@ -160,6 +208,11 @@ function Home() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         openSettings={() => setIsSettingsOpen(true)}
+        openGlobalRAG={() => setIsRAGOpen(true)}
+        openCollections={() => setIsCollectionsOpen(true)}
+        openAuditLogs={() => setIsAuditLogsOpen(true)}
+        openIntegrations={() => setIsIntegrationsOpen(true)}
+        openDigest={() => setIsDigestOpen(true)}
         articleCount={articles.filter(a => !a.isArchived).length}
       />
 
@@ -258,7 +311,7 @@ function Home() {
             <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-3xl font-black uppercase mb-2">No Articles Found</h2>
             <p className="text-gray-600 font-medium">
-              {searchQuery || selectedTag ? 'Try adjusting your search query or tag filters.' : 'Paste a URL above to save your first article.'}
+              {searchQuery || selectedTag || selectedCollectionId ? 'Try adjusting your search query or folder/tag filters.' : 'Paste a URL above to save your first article.'}
             </p>
           </div>
         ) : (
@@ -277,15 +330,46 @@ function Home() {
 
       </main>
 
+      {/* Enterprise Modals & Drawers */}
       <ReaderSettingsModal
         settings={settings}
         onUpdateSettings={(s) => setSettings(prev => ({ ...prev, ...s }))}
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      <GlobalRAGDrawer
+        isOpen={isRAGOpen}
+        onClose={() => setIsRAGOpen(false)}
+        onSelectArticle={(articleId) => navigate(`/read/${articleId}`)}
+      />
+
+      <TeamCollectionsModal
+        isOpen={isCollectionsOpen}
+        onClose={() => setIsCollectionsOpen(false)}
+        selectedCollectionId={selectedCollectionId}
+        onSelectCollection={(colId) => setSelectedCollectionId(colId)}
+      />
+
+      <AuditLogsModal
+        isOpen={isAuditLogsOpen}
+        onClose={() => setIsAuditLogsOpen(false)}
+      />
+
+      <IntegrationsModal
+        isOpen={isIntegrationsOpen}
+        onClose={() => setIsIntegrationsOpen(false)}
+        onArticleAdded={loadArticles}
+      />
+
+      <TeamDigestModal
+        isOpen={isDigestOpen}
+        onClose={() => setIsDigestOpen(false)}
+      />
     </div>
   );
 }
+
 
 function Reader() {
   const { id } = useParams<{ id: string }>();
