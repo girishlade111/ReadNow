@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FolderPlus, Folder, Trash2, Tag, Check, LayerGroup } from 'lucide-react';
+import { X, FolderPlus, Folder, Trash2, Tag, Check, Layers } from 'lucide-react';
 import { Collection } from '../types';
 import { api } from '../services/api';
 
