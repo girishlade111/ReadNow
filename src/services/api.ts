@@ -1,4 +1,6 @@
 import { Article, Highlight, AiAnalysis, AnalyticsData, Collection, Comment, AuditLog, EnterpriseSettings, WebhookConfig, WorkspaceRAGResponse } from '../types';
+import { idb } from './db';
+import { localStorageService } from './storage';
 
 export const api = {
   async getArticles(): Promise<Article[]> {
@@ -6,11 +8,26 @@ export const api = {
       const res = await fetch('/api/articles');
       if (!res.ok) throw new Error('Failed to fetch articles');
       const data = await res.json();
-      return data.articles || [];
+      const articles: Article[] = data.articles || [];
+
+      // Async cache into IndexedDB
+      idb.saveArticlesBulk(articles).catch(err => console.warn('IndexedDB bulk save error:', err));
+      
+      // Auto-migrate legacy localStorage articles if present
+      const legacy = localStorageService.getLegacyArticles();
+      if (legacy.length > 0) {
+        idb.saveArticlesBulk(legacy).catch(() => {});
+        localStorageService.clearLegacyArticles();
+      }
+
+      return articles;
     } catch (e) {
-      console.warn('API fetch failed, reading fallback from localStorage:', e);
-      const saved = localStorage.getItem('readnow_articles');
-      return saved ? JSON.parse(saved) : [];
+      console.warn('API fetch failed, reading fallback from IndexedDB:', e);
+      const cached = await idb.getAllArticles();
+      if (cached.length > 0) return cached;
+      
+      // Secondary fallback to legacy localStorage
+      return localStorageService.getLegacyArticles();
     }
   },
 
@@ -19,21 +36,32 @@ export const api = {
       const res = await fetch(`/api/articles/${id}`);
       if (!res.ok) throw new Error('Article not found');
       const data = await res.json();
+      if (data.article) {
+        idb.saveArticle(data.article).catch(() => {});
+      }
       return data.article;
     } catch (e) {
+      console.warn(`Fetch article ${id} failed, reading from IndexedDB fallback`);
+      const cached = await idb.getArticleById(id);
+      if (cached) return cached;
+
       const articles = await this.getArticles();
       return articles.find(a => a.id === id) || null;
     }
   },
 
-  async parseUrl(url: string): Promise<Article> {
+  async parseUrl(url: string, tags?: string[], collectionId?: string): Promise<Article> {
     const res = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url, tags, collectionId })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to parse URL');
+    
+    if (data.article) {
+      await idb.saveArticle(data.article);
+    }
     return data.article;
   },
 
@@ -45,6 +73,10 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to save document');
+    
+    if (data.article) {
+      await idb.saveArticle(data.article);
+    }
     return data.article;
   },
 
@@ -56,14 +88,16 @@ export const api = {
         body: JSON.stringify(updates)
       });
       const data = await res.json();
+      if (data.article) {
+        await idb.saveArticle(data.article);
+      }
       return data.article;
     } catch (e) {
-      const articles = await this.getArticles();
-      const idx = articles.findIndex(a => a.id === id);
-      if (idx >= 0) {
-        articles[idx] = { ...articles[idx], ...updates };
-        localStorage.setItem('readnow_articles', JSON.stringify(articles));
-        return articles[idx];
+      const cached = await idb.getArticleById(id);
+      if (cached) {
+        const updated = { ...cached, ...updates };
+        await idb.saveArticle(updated);
+        return updated;
       }
       throw e;
     }
@@ -72,11 +106,10 @@ export const api = {
   async deleteArticle(id: string): Promise<boolean> {
     try {
       const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' });
+      await idb.deleteArticle(id);
       return res.ok;
     } catch (e) {
-      const articles = await this.getArticles();
-      const filtered = articles.filter(a => a.id !== id);
-      localStorage.setItem('readnow_articles', JSON.stringify(filtered));
+      await idb.deleteArticle(id);
       return true;
     }
   },
@@ -125,9 +158,11 @@ export const api = {
     try {
       const res = await fetch(`/api/highlights?articleId=${articleId}`);
       const data = await res.json();
-      return data.highlights || [];
+      const highlights: Highlight[] = data.highlights || [];
+      highlights.forEach(h => idb.saveHighlight(h).catch(() => {}));
+      return highlights;
     } catch (e) {
-      return [];
+      return idb.getHighlights(articleId);
     }
   },
 
@@ -139,12 +174,21 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error('Failed to save highlight');
+    if (data.highlight) {
+      await idb.saveHighlight(data.highlight);
+    }
     return data.highlight;
   },
 
   async deleteHighlight(id: string): Promise<boolean> {
-    const res = await fetch(`/api/highlights/${id}`, { method: 'DELETE' });
-    return res.ok;
+    try {
+      const res = await fetch(`/api/highlights/${id}`, { method: 'DELETE' });
+      await idb.deleteHighlight(id);
+      return res.ok;
+    } catch (e) {
+      await idb.deleteHighlight(id);
+      return true;
+    }
   },
 
   // Collaborative Comments
@@ -152,9 +196,11 @@ export const api = {
     try {
       const res = await fetch(`/api/comments?articleId=${articleId}`);
       const data = await res.json();
-      return data.comments || [];
+      const comments = data.comments || [];
+      comments.forEach((c: Comment) => idb.saveComment(c).catch(() => {}));
+      return comments;
     } catch (e) {
-      return [];
+      return idb.getComments(articleId);
     }
   },
 
@@ -166,6 +212,9 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error('Failed to add comment');
+    if (data.comment) {
+      await idb.saveComment(data.comment);
+    }
     return data.comment;
   },
 
@@ -174,9 +223,11 @@ export const api = {
     try {
       const res = await fetch('/api/collections');
       const data = await res.json();
-      return data.collections || [];
+      const collections = data.collections || [];
+      collections.forEach((c: Collection) => idb.saveCollection(c).catch(() => {}));
+      return collections;
     } catch (e) {
-      return [];
+      return idb.getCollections();
     }
   },
 
@@ -188,12 +239,21 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error('Failed to create collection');
+    if (data.collection) {
+      await idb.saveCollection(data.collection);
+    }
     return data.collection;
   },
 
   async deleteCollection(id: string): Promise<boolean> {
-    const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
-    return res.ok;
+    try {
+      const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
+      await idb.deleteCollection(id);
+      return res.ok;
+    } catch (e) {
+      await idb.deleteCollection(id);
+      return true;
+    }
   },
 
   // Audit Logs
@@ -201,9 +261,11 @@ export const api = {
     try {
       const res = await fetch('/api/audit-logs');
       const data = await res.json();
-      return data.auditLogs || [];
+      const auditLogs = data.auditLogs || [];
+      auditLogs.forEach((log: AuditLog) => idb.saveAuditLog(log).catch(() => {}));
+      return auditLogs;
     } catch (e) {
-      return [];
+      return idb.getAuditLogs();
     }
   },
 
@@ -212,9 +274,13 @@ export const api = {
     try {
       const res = await fetch('/api/settings');
       const data = await res.json();
+      if (data.settings) {
+        idb.saveSettings(data.settings).catch(() => {});
+      }
       return data.settings;
     } catch (e) {
-      return { dlpEnabled: false, zeroDataRetention: true, autoDigestSchedule: 'weekly', retentionDays: 365 };
+      const cached = await idb.getSettings();
+      return cached || { dlpEnabled: false, zeroDataRetention: true, autoDigestSchedule: 'weekly', retentionDays: 365 };
     }
   },
 
@@ -226,6 +292,9 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error('Failed to update settings');
+    if (data.settings) {
+      await idb.saveSettings(data.settings);
+    }
     return data.settings;
   },
 
@@ -273,16 +342,20 @@ export const api = {
       const data = await res.json();
       return data.analytics;
     } catch (e) {
+      const articles = await idb.getAllArticles();
+      const highlights = await idb.getHighlights();
+      const readArticles = articles.filter(a => a.readProgress >= 80);
+      const totalWords = readArticles.reduce((acc, a) => acc + (a.textContent ? a.textContent.split(/\s+/).length : 0), 0);
+
       return {
-        totalArticles: 0,
-        articlesRead: 0,
-        totalReadingTimeMinutes: 0,
-        timeSavedMinutes: 0,
+        totalArticles: articles.length,
+        articlesRead: readArticles.length,
+        totalReadingTimeMinutes: Math.round(totalWords / 200),
+        timeSavedMinutes: readArticles.length * 3,
         readingStreakDays: 1,
-        highlightsCount: 0,
+        highlightsCount: highlights.length,
         topCategories: []
       };
     }
   }
 };
-
