@@ -53,7 +53,7 @@
   background-color: #18181b !important;
   color: #f4f4f5 !important;
   border-color: #ffffff !important;
-  shadow-color: #ffffff !important;
+  box-shadow: 8px 8px 0px 0px rgba(255, 255, 255, 1) !important;
 }
 
 .theme-sepia {
