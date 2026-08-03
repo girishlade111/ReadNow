@@ -1,4 +1,4 @@
-import { Article, Highlight, AiAnalysis, AnalyticsData } from '../types';
+import { Article, Highlight, AiAnalysis, AnalyticsData, Collection, Comment, AuditLog, EnterpriseSettings, WebhookConfig, WorkspaceRAGResponse } from '../types';
 
 export const api = {
   async getArticles(): Promise<Article[]> {
@@ -34,6 +34,17 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to parse URL');
+    return data.article;
+  },
+
+  async quickSave(doc: { title: string; content: string; url?: string; mediaType?: 'web' | 'text' | 'audio' | 'video'; collectionId?: string }): Promise<Article> {
+    const res = await fetch('/api/quick-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(doc)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save document');
     return data.article;
   },
 
@@ -81,6 +92,24 @@ export const api = {
     return data.answer;
   },
 
+  async askWorkspaceRAG(query: string): Promise<WorkspaceRAGResponse> {
+    const res = await fetch('/api/ai/workspace-ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Workspace RAG query failed');
+    return data;
+  },
+
+  async generateTeamDigest() {
+    const res = await fetch('/api/ai/digest', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to generate digest');
+    return data.digest;
+  },
+
   async translateArticle(articleId: string, targetLanguage: string) {
     const res = await fetch('/api/ai/translate', {
       method: 'POST',
@@ -118,6 +147,126 @@ export const api = {
     return res.ok;
   },
 
+  // Collaborative Comments
+  async getComments(articleId: string): Promise<Comment[]> {
+    try {
+      const res = await fetch(`/api/comments?articleId=${articleId}`);
+      const data = await res.json();
+      return data.comments || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async addComment(articleId: string, author: string, text: string): Promise<Comment> {
+    const res = await fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ articleId, author, text })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error('Failed to add comment');
+    return data.comment;
+  },
+
+  // Shared Collections
+  async getCollections(): Promise<Collection[]> {
+    try {
+      const res = await fetch('/api/collections');
+      const data = await res.json();
+      return data.collections || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async createCollection(name: string, description?: string, color?: string): Promise<Collection> {
+    const res = await fetch('/api/collections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description, color })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error('Failed to create collection');
+    return data.collection;
+  },
+
+  async deleteCollection(id: string): Promise<boolean> {
+    const res = await fetch(`/api/collections/${id}`, { method: 'DELETE' });
+    return res.ok;
+  },
+
+  // Audit Logs
+  async getAuditLogs(): Promise<AuditLog[]> {
+    try {
+      const res = await fetch('/api/audit-logs');
+      const data = await res.json();
+      return data.auditLogs || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // Settings & Governance
+  async getSettings(): Promise<EnterpriseSettings> {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      return data.settings;
+    } catch (e) {
+      return { dlpEnabled: false, zeroDataRetention: true, autoDigestSchedule: 'weekly', retentionDays: 365 };
+    }
+  },
+
+  async updateSettings(settings: Partial<EnterpriseSettings>): Promise<EnterpriseSettings> {
+    const res = await fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error('Failed to update settings');
+    return data.settings;
+  },
+
+  // Webhooks
+  async getWebhooks(): Promise<WebhookConfig[]> {
+    try {
+      const res = await fetch('/api/webhooks');
+      const data = await res.json();
+      return data.webhooks || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async createWebhook(name: string, url: string, events?: string[]): Promise<WebhookConfig> {
+    const res = await fetch('/api/webhooks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url, events })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error('Failed to save webhook');
+    return data.webhook;
+  },
+
+  async deleteWebhook(id: string): Promise<boolean> {
+    const res = await fetch(`/api/webhooks/${id}`, { method: 'DELETE' });
+    return res.ok;
+  },
+
+  async testWebhook(url: string): Promise<string> {
+    const res = await fetch('/api/webhooks/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Webhook ping failed');
+    return data.message;
+  },
+
   async getAnalytics(): Promise<AnalyticsData> {
     try {
       const res = await fetch('/api/analytics');
@@ -136,3 +285,4 @@ export const api = {
     }
   }
 };
+
