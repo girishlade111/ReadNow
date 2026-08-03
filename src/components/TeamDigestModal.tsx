@@ -106,7 +106,7 @@ export const TeamDigestModal: React.FC<TeamDigestModalProps> = ({ isOpen, onClos
 
                 <div className="space-y-2 text-xs">
                   <p className="font-bold text-gray-900 leading-relaxed bg-white p-3 border border-black">
-                    > {digest.summary}
+                    &gt; {digest.summary}
                   </p>
 
                   {digest.topInsights?.length > 0 && (
