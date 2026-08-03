@@ -36,13 +36,62 @@ export interface Article {
   isFavorite: boolean;
   readProgress: number;
   tags: string[];
+  collectionId?: string;
+  mediaType?: 'web' | 'text' | 'audio' | 'video';
   aiAnalysis?: AiAnalysis;
   translations?: Record<string, { title: string; content: string; summary?: string }>;
+}
+
+export interface Collection {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: string;
+}
+
+export interface Comment {
+  id: string;
+  articleId: string;
+  author: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  action: 'ARTICLE_SAVED' | 'ARTICLE_DELETED' | 'HIGHLIGHT_ADDED' | 'EXPORT_PERFORMED' | 'AI_RAG_QUERY' | 'DIGEST_GENERATED' | 'SETTINGS_UPDATED';
+  actor: string;
+  details: string;
+  ipAddress?: string;
+}
+
+export interface EnterpriseSettings {
+  dlpEnabled: boolean;
+  zeroDataRetention: boolean;
+  autoDigestSchedule: 'none' | 'daily' | 'weekly';
+  retentionDays: number;
+  slackWebhookUrl?: string;
+  customWebhookUrl?: string;
+}
+
+export interface WebhookConfig {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  enabled: boolean;
 }
 
 interface DatabaseSchema {
   articles: Article[];
   highlights: Highlight[];
+  collections: Collection[];
+  comments: Comment[];
+  auditLogs: AuditLog[];
+  settings: EnterpriseSettings;
+  webhooks: WebhookConfig[];
   analytics: {
     readingStreakDays: number;
     lastReadDate: string | null;
@@ -51,6 +100,21 @@ interface DatabaseSchema {
 
 const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'readnow_db.json');
+
+const DEFAULT_SETTINGS: EnterpriseSettings = {
+  dlpEnabled: false,
+  zeroDataRetention: true,
+  autoDigestSchedule: 'weekly',
+  retentionDays: 365,
+  slackWebhookUrl: '',
+  customWebhookUrl: ''
+};
+
+const DEFAULT_COLLECTIONS: Collection[] = [
+  { id: 'col-engineering', name: 'Engineering & Tech', description: 'Technical whitepapers and docs', color: '#3B82F6', createdAt: new Date().toISOString() },
+  { id: 'col-research', name: 'Market Research', description: 'Industry reports and competitor analysis', color: '#10B981', createdAt: new Date().toISOString() },
+  { id: 'col-strategy', name: 'Product Strategy', description: 'Product roadmaps & framework articles', color: '#8B5CF6', createdAt: new Date().toISOString() }
+];
 
 // Ensure database directory and file exist
 function initDb(): DatabaseSchema {
@@ -62,6 +126,27 @@ function initDb(): DatabaseSchema {
     const initialData: DatabaseSchema = {
       articles: [],
       highlights: [],
+      collections: DEFAULT_COLLECTIONS,
+      comments: [],
+      auditLogs: [
+        {
+          id: 'log-init',
+          timestamp: new Date().toISOString(),
+          action: 'SETTINGS_UPDATED',
+          actor: 'System Admin',
+          details: 'Enterprise Data Governance Database Initialized'
+        }
+      ],
+      settings: DEFAULT_SETTINGS,
+      webhooks: [
+        {
+          id: 'wh-slack',
+          name: 'Corporate Slack Channel',
+          url: 'https://hooks.slack.com/services/demo/channel',
+          events: ['ARTICLE_SAVED', 'DIGEST_GENERATED'],
+          enabled: false
+        }
+      ],
       analytics: {
         readingStreakDays: 1,
         lastReadDate: new Date().toISOString()
@@ -73,10 +158,29 @@ function initDb(): DatabaseSchema {
 
   try {
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return {
+      articles: parsed.articles || [],
+      highlights: parsed.highlights || [],
+      collections: parsed.collections || DEFAULT_COLLECTIONS,
+      comments: parsed.comments || [],
+      auditLogs: parsed.auditLogs || [],
+      settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
+      webhooks: parsed.webhooks || [],
+      analytics: parsed.analytics || { readingStreakDays: 1, lastReadDate: new Date().toISOString() }
+    };
   } catch (err) {
     console.error('Failed to parse database file, resetting:', err);
-    const initialData: DatabaseSchema = { articles: [], highlights: [], analytics: { readingStreakDays: 1, lastReadDate: new Date().toISOString() } };
+    const initialData: DatabaseSchema = {
+      articles: [],
+      highlights: [],
+      collections: DEFAULT_COLLECTIONS,
+      comments: [],
+      auditLogs: [],
+      settings: DEFAULT_SETTINGS,
+      webhooks: [],
+      analytics: { readingStreakDays: 1, lastReadDate: new Date().toISOString() }
+    };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
     return initialData;
   }
@@ -118,6 +222,7 @@ export const db = {
     const initialLen = data.articles.length;
     data.articles = data.articles.filter(a => a.id !== id);
     data.highlights = data.highlights.filter(h => h.articleId !== id);
+    data.comments = data.comments.filter(c => c.articleId !== id);
     saveDb(data);
     return data.articles.length < initialLen;
   },
@@ -143,6 +248,112 @@ export const db = {
     data.highlights = data.highlights.filter(h => h.id !== id);
     saveDb(data);
     return data.highlights.length < initialLen;
+  },
+
+  // Collections
+  getCollections(): Collection[] {
+    const data = initDb();
+    const articles = data.articles || [];
+    return (data.collections || []).map(col => ({
+      ...col,
+      articleCount: articles.filter(a => a.collectionId === col.id).length
+    }));
+  },
+
+  saveCollection(col: Collection): Collection {
+    const data = initDb();
+    const idx = data.collections.findIndex(c => c.id === col.id);
+    if (idx >= 0) {
+      data.collections[idx] = col;
+    } else {
+      data.collections.push(col);
+    }
+    saveDb(data);
+    return col;
+  },
+
+  deleteCollection(id: string): boolean {
+    const data = initDb();
+    data.collections = data.collections.filter(c => c.id !== id);
+    // Unassign articles from deleted collection
+    data.articles = data.articles.map(a => a.collectionId === id ? { ...a, collectionId: undefined } : a);
+    saveDb(data);
+    return true;
+  },
+
+  // Comments & Collaborative Annotations
+  getComments(articleId: string): Comment[] {
+    const data = initDb();
+    return (data.comments || []).filter(c => c.articleId === articleId);
+  },
+
+  addComment(comment: Comment): Comment {
+    const data = initDb();
+    data.comments.push(comment);
+    saveDb(data);
+    return comment;
+  },
+
+  // Audit Logs
+  getAuditLogs(): AuditLog[] {
+    const data = initDb();
+    return data.auditLogs || [];
+  },
+
+  addAuditLog(action: AuditLog['action'], actor: string, details: string): AuditLog {
+    const data = initDb();
+    const newLog: AuditLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      action,
+      actor,
+      details
+    };
+    data.auditLogs.unshift(newLog);
+    // Keep max 500 logs
+    if (data.auditLogs.length > 500) {
+      data.auditLogs = data.auditLogs.slice(0, 500);
+    }
+    saveDb(data);
+    return newLog;
+  },
+
+  // Settings & Governance
+  getSettings(): EnterpriseSettings {
+    const data = initDb();
+    return data.settings || DEFAULT_SETTINGS;
+  },
+
+  saveSettings(newSettings: Partial<EnterpriseSettings>): EnterpriseSettings {
+    const data = initDb();
+    data.settings = { ...data.settings, ...newSettings };
+    saveDb(data);
+    return data.settings;
+  },
+
+  // Webhooks
+  getWebhooks(): WebhookConfig[] {
+    const data = initDb();
+    return data.webhooks || [];
+  },
+
+  saveWebhook(wh: WebhookConfig): WebhookConfig {
+    const data = initDb();
+    const idx = data.webhooks.findIndex(w => w.id === wh.id);
+    if (idx >= 0) {
+      data.webhooks[idx] = wh;
+    } else {
+      data.webhooks.push(wh);
+    }
+    saveDb(data);
+    return wh;
+  },
+
+  deleteWebhook(id: string): boolean {
+    const data = initDb();
+    data.webhooks = data.webhooks.filter(w => w.id !== id);
+    saveDb(data);
+    return true;
   },
 
   getAnalytics() {
@@ -186,3 +397,4 @@ export const db = {
     };
   }
 };
+
