@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReadNow Extension Options</title>
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #3b82f6;
+      --border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .options-container {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .brand-icon { width: 36px; height: 36px; border-radius: 8px; }
+    h1 { font-size: 20px; font-weight: 700; color: #ffffff; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #38bdf8;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    input[type="text"] {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+    }
+
+    .toggle-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toggle-label { font-size: 13px; font-weight: 600; }
+    .toggle-desc { font-size: 11px; color: var(--text-muted); }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-secondary { background: rgba(255, 255, 255, 0.08); color: var(--text-main); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
+
+    #test-result {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+
+    .success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .error { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="options-container">
+    <header>
+      <img src="icons/icon48.png" alt="Logo" class="brand-icon">
+      <div>
+        <h1>ReadNow Extension Preferences</h1>
+        <p style="font-size: 12px; color: var(--text-muted);">Configure connection and behavior for ReadNow web app integration.</p>
+      </div>
+    </header>
+
+    <!-- Server Connection Card -->
+    <div class="card">
+      <div class="card-title">Server Connection</div>
+      
+      <div class="form-group">
+        <label for="server-url">ReadNow API Server Endpoint</label>
+        <input type="text" id="server-url" value="http://localhost:3000" placeholder="e.g. http://localhost:3000">
+      </div>
+
+      <div class="btn-row">
+        <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+        <button id="btn-test-connection" class="btn btn-secondary">Test Connection</button>
+      </div>
+
+      <div id="test-result" style="display: none;"></div>
+    </div>
+
+    <!-- Features & Integration Settings -->
+    <div class="card">
+      <div class="card-title">Extension Preferences</div>
+
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <span class="toggle-label">Automatic Offline Queue Sync</span>
+          <span class="toggle-desc">Automatically upload queued articles when ReadNow server reconnects.</span>
+        </div>
+        <input type="checkbox" id="chk-auto-sync" checked>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <span class="toggle-label">In-Page Selection Floating Toolbar</span>
+          <span class="toggle-desc">Show floating "Save to ReadNow" pill when selecting text on web pages.</span>
+        </div>
+        <input type="checkbox" id="chk-floating-tb" checked>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-info">
+          <span class="toggle-label">Enterprise DLP PII Protection</span>
+          <span class="toggle-desc">Mask emails, phone numbers, and SSNs locally before saving text snippets.</span>
+        </div>
+        <input type="checkbox" id="chk-dlp-mask">
+      </div>
+    </div>
+
+    <!-- Storage & Offline Queue -->
+    <div class="card">
+      <div class="card-title">Storage & Offline Queue</div>
+      <p style="font-size: 12px; color: var(--text-muted);">View status of local chrome storage and offline queue items.</p>
+      
+      <div class="btn-row">
+        <button id="btn-clear-queue" class="btn btn-secondary">Clear Offline Queue</button>
+      </div>
+      <div id="queue-status-text" style="font-size: 12px; color: #38bdf8;"></div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
