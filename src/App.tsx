@@ -4,7 +4,7 @@ import DOMPurify from 'dompurify';
 import { formatDistanceToNow } from 'date-fns';
 import {
   BookOpen, Plus, Search, ArrowLeft, ExternalLink, Loader2, Sparkles,
-  Volume2, Highlighting as HighlightIcon, Sliders, Download, CheckCircle2, Star, Archive
+  Volume2, Highlighter as HighlightIcon, Sliders, Download, CheckCircle2, Star, Archive
 } from 'lucide-react';
 
 import { Article, Highlight, ReaderSettings } from './types';

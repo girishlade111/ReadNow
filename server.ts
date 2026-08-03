@@ -274,7 +274,7 @@ app.post("/api/export", (req, res) => {
     md += `## Article Content\n\n${article.textContent}\n`;
 
     res.setHeader('Content-Type', 'text/markdown');
-    res.setHeader('Content-Disposition', `attachment; filename="${article.title.replace(/[^a-[#a-zA-Z0-9]/g, '_')}.md"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${article.title.replace(/[^a-zA-Z0-9]/g, '_')}.md"`);
     return res.send(md);
   }
 

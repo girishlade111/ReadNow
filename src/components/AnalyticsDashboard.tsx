@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnalyticsData } from '../types';
 import { api } from '../services/api';
-import { Flame, Clock, BookOpen, Sparkles, Highlight as HighlightIcon, Trophy, PieChart } from 'lucide-react';
+import { Flame, Clock, BookOpen, Sparkles, Highlighter as HighlightIcon, Trophy, PieChart } from 'lucide-react';
 
 export const AnalyticsDashboard: React.FC = () => {
   const [data, setData] = useState<AnalyticsData | null>(null);
