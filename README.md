@@ -4,8 +4,6 @@
 
 ReadNow is a full-stack **Express + Vite + React single-page application**. Server-side it fetches any URL, extracts the article body with Mozilla's Readability engine, stores everything in a local JSON database, and augments each document with an AI-generated executive analysis (summary, key takeaways, action items, sentiment, and suggested tags). It ships with reader-customization, text-to-speech, highlights and notes, an AI Copilot, workspace-wide RAG search, team digests, collections, exports, enterprise governance controls, audit logs, and outbound webhooks.
 
-**Live AI Studio instance:** https://ai.studio/apps/c1dbe0d5-a3a4-4f5d-8f64-e8e6bcda90b6
-
 ---
 
 ## Table of Contents
